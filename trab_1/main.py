@@ -3,77 +3,89 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-robo_planar = PlanarRobot()
 
-# Setar o comprimento do robo (unitario)
-l1 = l2 = 1
+def plot_orientacao(T, cor='k'):
+    pos = T[0:2, 3]     # posição (origem do frame)
+    x_axis = T[0:2, 0]  # vetor da direção do eixo x
+    y_axis = T[0:2, 1]  # vetor da direção do eixo y
+    escala = 0.4        # tamanho das setas
 
-# vetor tempo
-t = np.arange(0, 181, 1)  # de 0s até 180s
+    plt.quiver(*pos, *x_axis, color='r', scale=1/escala, scale_units='xy', angles='xy', width=0.005)
+    plt.quiver(*pos, *y_axis, color='g', scale=1/escala, scale_units='xy', angles='xy', width=0.005)
 
-# ângulos das juntas
-theta1 = np.arange(-90, 91, 1) 
-theta2 = np.arange(-90, 91, 1)  
+def plot_robot_frames(time, robo): 
 
-theta1_rad = np.deg2rad(theta1)
-theta2_rad = np.deg2rad(theta2)
+    l1 = robo.l1 
+    l2 = robo.l2
 
-# posição com variaveis simbolicas
-T1_sym, T_total_sym = robo_planar.forward_kinematics()
-T1_sym = T1_sym.subs({robo_planar.l1: l1, robo_planar.l2: l2})
-T_total_sym = T_total_sym.subs({robo_planar.l1: l1, robo_planar.l2: l2})
+    idx = np.where(t == time)[0][0]
 
-pos = []
+    th1 = theta1_rad[idx]
+    th2 = theta2_rad[idx]
 
-for th1, th2 in zip(theta1_rad, theta2_rad):
-    T1_num = T1_sym.subs({robo_planar.theta1: th1, robo_planar.theta2: th2})
-    T_total_num = T_total_sym.subs({robo_planar.theta1: th1, robo_planar.theta2: th2})
-    pos.append((T1_num, T_total_num))
+    # Plot da posição e eixos no tempo 0s
+    T0, T1, T2, T3, T4 = robo.get_numeric_frames(th1, th2, l1, l2)
+
+    origem = T0[0:2, 3]
+    link1 = T2[0:2, 3]
+    atuador = T4[0:2, 3]
+
+    plt.figure(figsize=(6, 6))
+
+    plt.plot([origem[0], link1[0]], [origem[1], link1[1]], 'b-', linewidth=1, label='Links')
+    plt.plot([link1[0], atuador[0]], [link1[1], atuador[1]], 'b-', linewidth=1)
+
+    plt.text(origem[0] + 0.05, origem[1] + 0.08, 'T_{0}', fontsize=8)
+    plt.text(link1[0] + 0.05, link1[1] + 0.08, 'T_{1}', fontsize=8)
+    plt.text(atuador[0] + 0.05, atuador[1] + 0.08, 'T_{2}', fontsize=8)
+
+    plt.plot(*origem, 'ko', markersize=3.5)
+    plt.plot(*link1, 'ko' ,markersize=3.5)
+    plt.plot(*atuador, 'ko',markersize=3.5)
+
+    plot_orientacao(T0)  # base
+    plot_orientacao(T2)  # após elo 1
+    plot_orientacao(T4)  # atuador
+
+    margem = 0.5
+    # Visualização final
+    plt.title(f'Posição do Robot em t = {time}s')
+    plt.axis('equal')
+    plt.xticks(np.arange(-3, 3.5, 0.5))
+    plt.yticks(np.arange(-3, 3.5, 0.5))
+    plt.grid(True)
+    plt.xlim(-l1 - l2 - margem, l1 + l2 + margem)
+    plt.ylim(-l1 - l2 - margem, l1 + l2 + margem)
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.legend()
+    plt.show()
+
+if __name__ == '__main__':    
+    robo_planar = PlanarRobot()
+
+    # Setar o comprimento do robo (unitario)
+    l1 = l2 = 1
+    robo_planar.l1 = l1
+    robo_planar.l2 = l2
+
+    # vetor tempo
+    t = np.arange(0, 181, 1)  # de 0s até 180s
+
+    # ângulos das juntas
+    theta1 = np.arange(-90, 91, 1) 
+    theta2 = np.arange(-90, 91, 1)  
+
+    theta1_rad = np.deg2rad(theta1)
+    theta2_rad = np.deg2rad(theta2)
+
+    # Plotando em t = 0s
+    plot_robot_frames(0, robo_planar)
+
+    # Plotando em t = 90s
+    plot_robot_frames(90, robo_planar)
+
+    # Plotando t = 180 s
+    plot_robot_frames(180, robo_planar)
     
 
-dados = []
-
-for tempo, (T1_num, T_total_num) in enumerate(pos):
-    # Base
-    x_base, y_base = 0, 0
-
-    # Junta 1 (fim do primeiro link)
-    x_junta1 = float(T1_num[0, 3])
-    y_junta1 = float(T1_num[1, 3])
-
-    # Efetuador (fim do segundo link)
-    x_efet = float(T_total_num[0, 3])
-    y_efet = float(T_total_num[1, 3])
-
-    dados.append({
-            'tempo (s)': tempo,
-            'x_base': x_base, 'y_base': y_base,
-            'x_junta1': x_junta1, 'y_junta1': y_junta1,
-            'x_efetuador': x_efet, 'y_efetuador': y_efet
-        })
-    
-df = pd.DataFrame(dados)
-
-plt.figure(figsize=(8, 8))
-
-plt.plot(df['x_junta1'], df['y_junta1'], 'b--', label='Trajetória Junta 1')
-plt.plot(df['x_efetuador'], df['y_efetuador'], 'r--', label='Trajetória Efetuador')
-
-amostras = np.linspace(0, len(df) - 1, 10, dtype=int)  # escolher 10 poses
-
-for idx in amostras:
-    x = [df.loc[idx, 'x_base'], df.loc[idx, 'x_junta1'], df.loc[idx, 'x_efetuador']]
-    y = [df.loc[idx, 'y_base'], df.loc[idx, 'y_junta1'], df.loc[idx, 'y_efetuador']]
-    
-    plt.plot(x, y, 'ko-', linewidth=2)  
-    plt.plot(x[0], y[0], 'go', markersize=8)  
-    plt.plot(x[1], y[1], 'bo', markersize=8)  
-    plt.plot(x[2], y[2], 'ro', markersize=8)  
-
-plt.title('Trajetória e Estrutura do Robô Planar')
-plt.xlabel('X (m)')
-plt.ylabel('Y (m)')
-plt.grid(True)
-plt.axis('equal')
-plt.legend()
-plt.show()
