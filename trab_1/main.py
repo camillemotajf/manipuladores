@@ -13,15 +13,15 @@ def plot_orientacao(T, cor='k'):
     plt.quiver(*pos, *x_axis, color='r', scale=1/escala, scale_units='xy', angles='xy', width=0.005)
     plt.quiver(*pos, *y_axis, color='g', scale=1/escala, scale_units='xy', angles='xy', width=0.005)
 
-def plot_robot_frames(time, robo): 
+def plot_robot_frames(time, theta1, theta2, robo): 
 
     l1 = robo.l1 
     l2 = robo.l2
 
     idx = np.where(t == time)[0][0]
 
-    th1 = theta1_rad[idx]
-    th2 = theta2_rad[idx]
+    th1 = theta1[idx]
+    th2 = theta2[idx]
 
     # Plot da posição e eixos no tempo 0s
     T0, T1, T2, T3, T4 = robo.get_numeric_frames(th1, th2, l1, l2)
@@ -61,6 +61,98 @@ def plot_robot_frames(time, robo):
     plt.legend()
     plt.show()
 
+def plot_trajectory_over_time(times, theta1, theta2, robo, t_vector, salto=20):
+    l1 = robo.l1
+    l2 = robo.l2
+    
+    # Lista para armazenar as posições (x,y) do atuador nos tempos selecionados
+    x_pos = []
+    y_pos = []
+
+    # Seleciona os tempos pulando de salto em salto
+    tempos_selecionados = times[::salto]
+
+    for time in tempos_selecionados:
+        idx = np.where(t_vector == time)[0][0]
+        th1 = theta1[idx]
+        th2 = theta2[idx]
+        
+        T0, T1, T2, T3, T4 = robo.get_numeric_frames(th1, th2, l1, l2)
+        
+        atuador = T4[0:2, 3]
+        x_pos.append(atuador[0])
+        y_pos.append(atuador[1])
+    
+    # Plot único com as posições ao longo do tempo
+    plt.figure(figsize=(7,7))
+    plt.plot(x_pos, y_pos, 'o-', label='Trajetória atuador')
+    
+    # Marcar cada ponto com o tempo correspondente
+    for (x, y, time) in zip(x_pos, y_pos, tempos_selecionados):
+        plt.text(x + 0.03, y + 0.03, f'{time}s', fontsize=8)
+    
+    plt.title('Trajetória XY do atuador ao longo do tempo')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.grid(True)
+    plt.axis('equal')
+    plt.legend()
+    plt.show()
+
+def plot_robot_trajectory_with_links(times, theta1, theta2, robo, t_vector, salto=20):
+    l1 = robo.l1
+    l2 = robo.l2
+    label = False
+
+    plt.figure(figsize=(7, 7))
+    
+    # Para cada tempo espaçado
+    for time in times[::salto]:
+
+        idx = np.where(t_vector == time)[0][0]
+        th1 = theta1[idx]
+        th2 = theta2[idx]
+
+        T0, T1, T2, T3, T4 = robo.get_numeric_frames(th1, th2, l1, l2)
+        
+        origem = T0[0:2, 3]
+        link1 = T2[0:2, 3]
+        atuador = T4[0:2, 3]
+        
+        # Plota os links como linhas
+        plt.plot([origem[0], link1[0]], [origem[1], link1[1]], 'b-', linewidth=1)
+        plt.plot([link1[0], atuador[0]], [link1[1], atuador[1]], 'b-', linewidth=1)
+        plt.xticks(np.arange(-3, 3.5, 0.5))
+        plt.yticks(np.arange(-3, 3.5, 0.5))
+        
+        if not label:
+            plt.plot(*origem, 'ko', label='Origem', markersize=4)
+            plt.plot(*atuador, 'go', label='Atuador', markersize=4)
+            label = True
+        else:
+            plt.plot(*origem, 'ko', markersize=4)
+            plt.plot(*atuador, 'go', markersize=4)
+
+        plt.plot(*link1, 'ro', markersize=4)  # sem label
+
+        
+        # Adiciona texto com o tempo próximo ao atuador
+        plt.text(atuador[0] + 0.03, atuador[1] + 0.03, f'{time}s', fontsize=8)
+    
+    plt.title('Trajetória do robô com links em diferentes tempos')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.grid(True)
+    plt.axis('equal')
+    
+    margem = l1 + l2 + 0.5
+    plt.xlim(-margem, margem)
+    plt.ylim(-margem, margem)
+    plt.legend()
+    plt.show()
+
+
+
 if __name__ == '__main__':    
     robo_planar = PlanarRobot()
 
@@ -80,12 +172,16 @@ if __name__ == '__main__':
     theta2_rad = np.deg2rad(theta2)
 
     # Plotando em t = 0s
-    plot_robot_frames(0, robo_planar)
+    plot_robot_frames(time=0, theta1=theta1_rad, theta2=theta1_rad, robo=robo_planar)
 
-    # Plotando em t = 90s
-    plot_robot_frames(90, robo_planar)
+    # Plotando em t = 30s
+    plot_robot_frames(time=30, theta1=theta1_rad, theta2=theta1_rad, robo=robo_planar)
 
-    # Plotando t = 180 s
-    plot_robot_frames(180, robo_planar)
+    # Plotando t = 60s
+    plot_robot_frames(time=60, theta1=theta1_rad, theta2=theta1_rad, robo=robo_planar)
+
+    plot_trajectory_over_time(t, theta1_rad, theta2_rad, robo_planar, t, salto=20)
+
+    plot_robot_trajectory_with_links(t, theta1_rad, theta2_rad, robo_planar, t, salto=20)
     
 
